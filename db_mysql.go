@@ -88,38 +88,96 @@ type rowScanner interface {
 }
 
 func scanBook(s rowScanner) (*Novel, error) {
-	// todo
+	var (
+		id            int64
+		title         sql.NullString
+		author        sql.NullString
+		publishedDate sql.NullString
+		imageURL      sql.NullString
+		description   sql.NullString
+		createdBy     sql.NullString
+		createdByID   sql.NullString
+	)
+	if err := s.Scan(&id, &title, &author, &publishedDate, &imageURL, &description, &createdBy, &createdByID); err != nil {
+		return nil, err
+	}
+	novel := &Novel{
+		ID:            id,
+		Title:         title.String,
+		Author:        author.String,
+		PublishedDate: publishedDate.String,
+		ImageURL:      imageURL.String,
+		Description:   description.String,
+		CreatedBy:     createdBy.String,
+		CreatedByID:   createdByID.String,
+	}
+	return novel, nil
 }
 
 const listStatement = `SELECT * FROM novels ORDER BY title`
 
-func (db *mysqlDB) ListBooks() ([]*Novel, error) {
+func (db *mysqlDB) ListNovels() ([]*Novel, error) {
 	rows, err := db.list.Query()
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var novel Novel
+	var novels []*Novel
 	for rows.Next() {
 		novel, err := scanBook(rows)
+		if err != nil {
+			return nil, fmt.Errorf("mysql: could not read row: %v", err)
+		}
+		novels = append(novels, novel)
 	}
+	return novels, nil
 }
 
-func (db *mysqlDB) ListNovels() ([]*Novel, error) {
-	panic("implement me")
-}
+const listByStatement = `
+	SELECT * FROM novels
+	WHERE createdById = ? ORDER BY title`
 
 func (db *mysqlDB) ListNovelsCreatedBy(userID string) ([]*Novel, error) {
-	panic("implement me")
+	if userID == "" {
+		return db.ListNovels()
+	}
+	rows, err := db.list.Query(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var novels []*Novel
+	for rows.Next() {
+		novel, err := scanBook(rows)
+		if err != nil {
+			return nil, fmt.Errorf("mysql: could not read row: %v", err)
+		}
+		novels = append(novels, novel)
+	}
+	return novels, nil
 }
+
+const getStatement = "SELECT * FROM novels WHERE id = ?"
 
 func (db *mysqlDB) GetNovel(id int64) (*Novel, error) {
-	panic("implement me")
+	novel, err := scanBook(db.get.QueryRow(id))
+	if err != sql.ErrNoRows {
+		return nil, fmt.Errorf("mysql: could not find novel with id %d", id)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("mysql: could not get novel")
+	}
+	return novel, nil
 }
 
+const insertStatement = `
+	INSERT INTO novels (
+	title, author, publishedDate, imageUrl, description, createdBy, createdById
+	) VALUES (?, ?, ?, ?, ?, ?, ?)`
+
 func (db *mysqlDB) AddNovel(b *Novel) (id int64, err error) {
-	panic("implement me")
+	r, err := execAffectingOneRow()
 }
 
 func (db *mysqlDB) DeleteNovel(id int64) error {
@@ -165,4 +223,18 @@ func createTable(conn *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+func execAffectingOneRow(stmt *sql.Stmt, args ...interface{}) (sql.Result, error) {
+	r, err := stmt.Exec(args...)
+	if err != nil {
+		return r, fmt.Errorf("mysql: could not execute statement: %v", err)
+	}
+	rowsAffected, err := r.RowsAffected()
+	if err != nil {
+		return r, fmt.Errorf("mysql: could not get rows affected: %v", err)
+	} else if rowsAffected != 1 {
+		return r, fmt.Errorf("mysql: expected 1 row affected, got %d", rowsAffected)
+	}
+	return r, nil
 }

@@ -25,7 +25,7 @@ type cloudSQLConfig struct {
 	Instance string
 }
 
-func configureClousSQL(config cloudSQLConfig) (NovelDatabase, error) {
+func configureCloudSQL(config cloudSQLConfig) (NovelDatabase, error) {
 	if os.Getenv("GAE_INSTANCE") != "" {
 		return newMySQLDB(MySQLConfig{
 			Username:   config.Username,

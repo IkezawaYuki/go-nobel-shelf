@@ -2,7 +2,7 @@ package main
 
 type Novel struct {
 	ID            int64
-	Title         int64
+	Title         string
 	Author        string
 	PublishedDate string
 	ImageURL      string
