@@ -177,15 +177,48 @@ const insertStatement = `
 	) VALUES (?, ?, ?, ?, ?, ?, ?)`
 
 func (db *mysqlDB) AddNovel(b *Novel) (id int64, err error) {
-	r, err := execAffectingOneRow()
+	r, err := execAffectingOneRow(db.insert, b.Title, b.Author, b.PublishedDate, b.ImageURL, b.Description, b.CreatedBy, b.CreatedByID)
+	if err != nil {
+		return 0, err
+	}
+	lastInsertID, err := r.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("mysql: could not get last insert ID: %v", err)
+	}
+	return lastInsertID, nil
 }
 
+const deleteStatement = `DELETE FROM novels WHERE id = ?`
+
+// todo check
 func (db *mysqlDB) DeleteNovel(id int64) error {
-	panic("implement me")
+	r, err := execAffectingOneRow(db.delete, id)
+	if err != nil {
+		return err
+	}
+	_, err = r.RowsAffected()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
+const updateStatement = `	
+	UPDATE novels 
+	SET title = ?, author = ?, publishedDate = ?, imageUrl = ?, description = ?, createdBy = ?, createdById = ?
+	WHERE id = ?`
+
+// todo check
 func (db *mysqlDB) UpdateBook(b *Novel) error {
-	panic("implement me")
+	r, err := execAffectingOneRow(db.delete, b.Title, b.Author, b.PublishedDate, b.ImageURL, b.Description, b.CreatedBy, b.CreatedByID, b.ID)
+	if err != nil {
+		return err
+	}
+	_, err = r.RowsAffected()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (config MySQLConfig) ensureTableExists() error {
