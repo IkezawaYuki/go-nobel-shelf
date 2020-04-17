@@ -25,6 +25,12 @@ type cloudSQLConfig struct {
 	Instance string
 }
 
+func init() {
+	var err error
+
+	DB = newMemoryDB()
+}
+
 func configureCloudSQL(config cloudSQLConfig) (NovelDatabase, error) {
 	if os.Getenv("GAE_INSTANCE") != "" {
 		return newMySQLDB(MySQLConfig{
@@ -33,4 +39,11 @@ func configureCloudSQL(config cloudSQLConfig) (NovelDatabase, error) {
 			UnixSocket: "/cloudsql/" + config.Instance,
 		})
 	}
+
+	return newMySQLDB(MySQLConfig{
+		Username: config.Username,
+		Password: config.Password,
+		Host:     "localhost",
+		Port:     3306,
+	})
 }
