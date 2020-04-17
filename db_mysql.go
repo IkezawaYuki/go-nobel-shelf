@@ -192,15 +192,11 @@ const deleteStatement = `DELETE FROM novels WHERE id = ?`
 
 // todo check
 func (db *mysqlDB) DeleteNovel(id int64) error {
-	r, err := execAffectingOneRow(db.delete, id)
-	if err != nil {
-		return err
+	if id == 0 {
+		return fmt.Errorf("mysql: book with unassigned ID passed into deleteBook")
 	}
-	_, err = r.RowsAffected()
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := execAffectingOneRow(db.delete, id)
+	return err
 }
 
 const updateStatement = `	
@@ -208,17 +204,13 @@ const updateStatement = `
 	SET title = ?, author = ?, publishedDate = ?, imageUrl = ?, description = ?, createdBy = ?, createdById = ?
 	WHERE id = ?`
 
-// todo check
 func (db *mysqlDB) UpdateBook(b *Novel) error {
-	r, err := execAffectingOneRow(db.delete, b.Title, b.Author, b.PublishedDate, b.ImageURL, b.Description, b.CreatedBy, b.CreatedByID, b.ID)
-	if err != nil {
-		return err
+	if b.ID == 0 {
+		return fmt.Errorf("mysql: book with unassigned ID passed into updateBook")
 	}
-	_, err = r.RowsAffected()
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := execAffectingOneRow(db.delete, b.Title, b.Author, b.PublishedDate,
+		b.ImageURL, b.Description, b.CreatedBy, b.CreatedByID, b.ID)
+	return err
 }
 
 func (config MySQLConfig) ensureTableExists() error {
