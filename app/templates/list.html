@@ -1,0 +1,20 @@
+
+<h3>Novels</h3>
+<a href="/novels/add" class="btn btn-success btn-sm">
+    <i class="glyphicon glyphocon-plus"></i>
+    <span>Add Novel</span>
+</a>
+
+{{range .}}
+    <div class="media">
+        <div class="media-left">
+            <img src="{{if .ImageURL}}{{.ImageURL}}{{else}}https://placekitten.com/g/200/300{{end}}">
+        </div>
+        <div class="media-body">
+            <h4><a href="/novels/{{.ID}}">{{.Title}}</a></h4>
+            <p>{{.Author}}</p>
+        </div>
+    </div>
+{{else}}
+    <p>No novels found.</p>
+{{end}}
