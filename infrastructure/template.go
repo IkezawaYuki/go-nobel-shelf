@@ -1,8 +1,7 @@
-package main
+package infrastructure
 
 import (
 	"fmt"
-	novels "github.com/IkezawaYuki/go-novel-shelf"
 	"html/template"
 	"io/ioutil"
 	"net/http"
@@ -10,8 +9,8 @@ import (
 )
 
 func parseTemplate(filename string) *appTemplate {
-	tmpl := template.Must(template.ParseFiles("templates/base.html"))
-	path := filepath.Join("templates", filename)
+	tmpl := template.Must(template.ParseFiles("infrastructure/templates/base.html"))
+	path := filepath.Join("infrastructure/templates", filename)
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		panic(fmt.Errorf("could not read template: %v", err))
@@ -33,9 +32,16 @@ func (tmpl *appTemplate) Execute(w http.ResponseWriter, r *http.Request, data in
 		LogoutURL   string
 	}{
 		Data:        data,
-		AuthEnabled: novels.OAuthConfig != nil,
+		AuthEnabled: OAuthConfig != nil,
 		LoginURL:    "login?redirect=" + r.URL.RequestURI(),
 		LogoutURL:   "logout?redirect=" + r.URL.RequestURI(),
 	}
 
+	if d.AuthEnabled {
+		d.Profile = profileFromSession(r)
+	}
+	if err := tmpl.t.Execute(w, d); err != nil {
+		return appErrorf(err, "could not write template: %v", err)
+	}
+	return nil
 }

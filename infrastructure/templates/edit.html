@@ -1,6 +1,6 @@
 <h3>{{if .}}Edit{{else}}Add{{end}} novel</h3>
 
-<form method="post" enctype="multipart/form-data" action="/books{{if .}}/{{.ID}}{{end}}">
+<form method="post" enctype="multipart/form-data" action="/novels{{if .}}/{{.ID}}{{end}}">
     <div class="form-group">
         <label for="title">Title</label>
         <input class="form-control" name="title" id="title" value="{{.Title}}">

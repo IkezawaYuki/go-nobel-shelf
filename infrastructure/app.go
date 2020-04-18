@@ -1,4 +1,4 @@
-package main
+package infrastructure
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -6,14 +6,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	novelshel "github.com/IkezawaYuki/go-novel-shelf"
+	"github.com/IkezawaYuki/go-novel-shelf/domain"
 	"github.com/gorilla/handlers"
 	uuid "github.com/satori/go.uuid"
 	"io"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
-	"google.golang.org/appengine"
 	"log"
 	"net/http"
 	"path"
@@ -28,12 +28,12 @@ var (
 
 type appHandler func(w http.ResponseWriter, r *http.Request) *appError
 
-func main() {
-	registerHandlers()
-	appengine.Main()
+func Run() {
+	RegisterHandlers()
+	//appengine.Main()
 }
 
-func registerHandlers() {
+func RegisterHandlers() {
 	r := mux.NewRouter()
 
 	r.Handle("/", http.RedirectHandler("/novels", http.StatusFound))
@@ -52,10 +52,20 @@ func registerHandlers() {
 		w.Write([]byte("ok"))
 	})
 	http.Handle("/", handlers.CombinedLoggingHandler(os.Stderr, r))
+
+	srv := &http.Server{
+		Handler: r,
+		Addr:    "127.0.0.1:8080",
+		// Good practice: enforce timeouts for servers you create!
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
+	srv.ListenAndServe()
 }
 
 func listHandler(w http.ResponseWriter, r *http.Request) *appError {
-	novels, err := novelshel.DB.ListNovels()
+	fmt.Println("list handler is invoked")
+	novels, err := DB.ListNovels()
 	if err != nil {
 		return appErrorf(err, "could not list novels: %v", err)
 	}
@@ -69,19 +79,19 @@ func listMineHandler(w http.ResponseWriter, r *http.Request) *appError {
 		return nil
 	}
 
-	novels, err := novelshel.DB.ListNovelsCreatedBy(user.ID)
+	novels, err := DB.ListNovelsCreatedBy(user.ID)
 	if err != nil {
 		return appErrorf(err, "could not list novels: %v", err)
 	}
 	return listTmpl.Execute(w, r, novels)
 }
 
-func novelFromRequest(r *http.Request) (*novelshel.Novel, error) {
+func novelFromRequest(r *http.Request) (*domain.Novel, error) {
 	id, err := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("bad novel id: %v", err)
 	}
-	novel, err := novelshel.DB.GetNovel(id)
+	novel, err := DB.GetNovel(id)
 	if err != nil {
 		return nil, fmt.Errorf("could not find book: %v", err)
 	}
@@ -108,7 +118,7 @@ func editFormHandler(w http.ResponseWriter, r *http.Request) *appError {
 	return editTmpl.Execute(w, r, novel)
 }
 
-func novelFromForm(r *http.Request) (*novelshel.Novel, error) {
+func novelFromForm(r *http.Request) (*domain.Novel, error) {
 	imageURL, err := uploadFileFromForm(r)
 	if err != nil {
 		return nil, fmt.Errorf("could not upload file: %v", err)
@@ -116,7 +126,7 @@ func novelFromForm(r *http.Request) (*novelshel.Novel, error) {
 	if imageURL == "" {
 		imageURL = r.FormValue("imageURL")
 	}
-	novel := &novelshel.Novel{
+	novel := &domain.Novel{
 		Title:         r.FormValue("title"),
 		Author:        r.FormValue("author"),
 		PublishedDate: r.FormValue("publishedDate"),
@@ -146,12 +156,12 @@ func uploadFileFromForm(r *http.Request) (url string, err error) {
 	if err != nil {
 		return "", err
 	}
-	if novelshel.StorageBucket == nil {
+	if StorageBucket == nil {
 		return "", fmt.Errorf("strage bucket is missing - check config.go")
 	}
 	name := uuid.Must(uuid.NewV4()).String() + path.Ext(fh.Filename)
 	ctx := context.Background()
-	w := novelshel.StorageBucket.Object(name).NewWriter(ctx)
+	w := StorageBucket.Object(name).NewWriter(ctx)
 	w.ACL = []storage.ACLRule{{Entity: storage.AllUsers, Role: storage.RoleReader}}
 	w.ContentType = fh.Header.Get("Content-Type")
 	w.CacheControl = "public, max-age=86400"
@@ -164,7 +174,7 @@ func uploadFileFromForm(r *http.Request) (url string, err error) {
 	}
 
 	const publicURL = "https://storage.googleapis.com/%s/%s"
-	return fmt.Sprintf(publicURL, novelshel.StorageBucketName, name), nil
+	return fmt.Sprintf(publicURL, StorageBucketName, name), nil
 }
 
 func createHandler(w http.ResponseWriter, r *http.Request) *appError {
@@ -172,7 +182,7 @@ func createHandler(w http.ResponseWriter, r *http.Request) *appError {
 	if err != nil {
 		return appErrorf(err, "could not parse book from form: %v", err)
 	}
-	id, err := novelshel.DB.AddNovel(novel)
+	id, err := DB.AddNovel(novel)
 	if err != nil {
 		return appErrorf(err, "could not save novel: %v", err)
 	}
@@ -192,7 +202,7 @@ func updateHandler(w http.ResponseWriter, r *http.Request) *appError {
 	}
 	novel.ID = id
 
-	err = novelshel.DB.UpdateBook(novel)
+	err = DB.UpdateBook(novel)
 	if err != nil {
 		return appErrorf(err, "could not save novel: %v", err)
 	}
@@ -206,7 +216,7 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) *appError {
 	if err != nil {
 		return appErrorf(err, "bad novel id: %v", err)
 	}
-	err = novelshel.DB.DeleteNovel(id)
+	err = DB.DeleteNovel(id)
 	if err != nil {
 		return appErrorf(err, "could not delete novel: %v", err)
 	}
@@ -215,7 +225,7 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) *appError {
 }
 
 func publishedUpdate(novelID int64) {
-	if novelshel.PubsubClient == nil {
+	if PubsubClient == nil {
 		return
 	}
 	ctx := context.Background()
@@ -223,7 +233,7 @@ func publishedUpdate(novelID int64) {
 	if err != nil {
 		return
 	}
-	topic := novelshel.PubsubClient.Topic(novelshel.PubsubTopicID)
+	topic := PubsubClient.Topic(PubsubTopicID)
 	_, err = topic.Publish(ctx, &pubsub.Message{
 		Data: b,
 	}).Get(ctx)

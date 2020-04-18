@@ -1,9 +1,10 @@
-package main
+package datastore
 
 import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/IkezawaYuki/go-novel-shelf/domain"
 	"github.com/go-sql-driver/mysql"
 )
 
@@ -33,7 +34,7 @@ type mysqlDB struct {
 	delete *sql.Stmt
 }
 
-var _ NovelDatabase = &mysqlDB{}
+var _ domain.NovelDatabase = &mysqlDB{}
 
 type MySQLConfig struct {
 	Username   string
@@ -58,7 +59,7 @@ func (c MySQLConfig) dataStoreName(databaseName string) string {
 	return fmt.Sprintf("%stcp[%s]:%d/%s", cred, c.Host, c.Port, databaseName)
 }
 
-func newMySQLDB(config MySQLConfig) (NovelDatabase, error) {
+func NewMySQLDB(config MySQLConfig) (domain.NovelDatabase, error) {
 	if err := config.ensureTableExists(); err != nil {
 		return nil, err
 	}
@@ -77,6 +78,23 @@ func newMySQLDB(config MySQLConfig) (NovelDatabase, error) {
 	if db.list, err = conn.Prepare(listStatement); err != nil {
 		return nil, fmt.Errorf("mysql: prepare list: %v", err)
 	}
+	if db.listBy, err = conn.Prepare(listByStatement); err != nil {
+		return nil, fmt.Errorf("mysql: prepare listBy: %v", err)
+	}
+	if db.get, err = conn.Prepare(getStatement); err != nil {
+		return nil, fmt.Errorf("mysql: prepare get: %v", err)
+	}
+	if db.insert, err = conn.Prepare(insertStatement); err != nil {
+		return nil, fmt.Errorf("mysql: prepare insert: %v", err)
+	}
+	if db.update, err = conn.Prepare(updateStatement); err != nil {
+		return nil, fmt.Errorf("mysql: prepare update: %v", err)
+	}
+	if db.delete, err = conn.Prepare(deleteStatement); err != nil {
+		return nil, fmt.Errorf("mysql: prepare delete: %v", err)
+	}
+
+	return db, nil
 }
 
 func (db *mysqlDB) Close() {
@@ -87,7 +105,7 @@ type rowScanner interface {
 	Scan(dest ...interface{}) error
 }
 
-func scanBook(s rowScanner) (*Novel, error) {
+func scanBook(s rowScanner) (*domain.Novel, error) {
 	var (
 		id            int64
 		title         sql.NullString
@@ -101,7 +119,7 @@ func scanBook(s rowScanner) (*Novel, error) {
 	if err := s.Scan(&id, &title, &author, &publishedDate, &imageURL, &description, &createdBy, &createdByID); err != nil {
 		return nil, err
 	}
-	novel := &Novel{
+	novel := &domain.Novel{
 		ID:            id,
 		Title:         title.String,
 		Author:        author.String,
@@ -116,14 +134,14 @@ func scanBook(s rowScanner) (*Novel, error) {
 
 const listStatement = `SELECT * FROM novels ORDER BY title`
 
-func (db *mysqlDB) ListNovels() ([]*Novel, error) {
+func (db *mysqlDB) ListNovels() ([]*domain.Novel, error) {
 	rows, err := db.list.Query()
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var novels []*Novel
+	var novels []*domain.Novel
 	for rows.Next() {
 		novel, err := scanBook(rows)
 		if err != nil {
@@ -138,7 +156,7 @@ const listByStatement = `
 	SELECT * FROM novels
 	WHERE createdById = ? ORDER BY title`
 
-func (db *mysqlDB) ListNovelsCreatedBy(userID string) ([]*Novel, error) {
+func (db *mysqlDB) ListNovelsCreatedBy(userID string) ([]*domain.Novel, error) {
 	if userID == "" {
 		return db.ListNovels()
 	}
@@ -147,7 +165,7 @@ func (db *mysqlDB) ListNovelsCreatedBy(userID string) ([]*Novel, error) {
 		return nil, err
 	}
 
-	var novels []*Novel
+	var novels []*domain.Novel
 	for rows.Next() {
 		novel, err := scanBook(rows)
 		if err != nil {
@@ -160,7 +178,7 @@ func (db *mysqlDB) ListNovelsCreatedBy(userID string) ([]*Novel, error) {
 
 const getStatement = "SELECT * FROM novels WHERE id = ?"
 
-func (db *mysqlDB) GetNovel(id int64) (*Novel, error) {
+func (db *mysqlDB) GetNovel(id int64) (*domain.Novel, error) {
 	novel, err := scanBook(db.get.QueryRow(id))
 	if err != sql.ErrNoRows {
 		return nil, fmt.Errorf("mysql: could not find novel with id %d", id)
@@ -176,7 +194,7 @@ const insertStatement = `
 	title, author, publishedDate, imageUrl, description, createdBy, createdById
 	) VALUES (?, ?, ?, ?, ?, ?, ?)`
 
-func (db *mysqlDB) AddNovel(b *Novel) (id int64, err error) {
+func (db *mysqlDB) AddNovel(b *domain.Novel) (id int64, err error) {
 	r, err := execAffectingOneRow(db.insert, b.Title, b.Author, b.PublishedDate, b.ImageURL, b.Description, b.CreatedBy, b.CreatedByID)
 	if err != nil {
 		return 0, err
@@ -204,7 +222,7 @@ const updateStatement = `
 	SET title = ?, author = ?, publishedDate = ?, imageUrl = ?, description = ?, createdBy = ?, createdById = ?
 	WHERE id = ?`
 
-func (db *mysqlDB) UpdateBook(b *Novel) error {
+func (db *mysqlDB) UpdateBook(b *domain.Novel) error {
 	if b.ID == 0 {
 		return fmt.Errorf("mysql: book with unassigned ID passed into updateBook")
 	}

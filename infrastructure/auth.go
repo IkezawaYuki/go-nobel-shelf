@@ -1,8 +1,7 @@
-package main
+package infrastructure
 
 import (
 	"encoding/gob"
-	novels "github.com/IkezawaYuki/go-novel-shelf"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/plus/v1"
 	"net/http"
@@ -21,7 +20,7 @@ func init() {
 }
 
 func profileFromSession(r *http.Request) *Profile {
-	session, err := novels.SessionStore.Get(r, defaultSessionID)
+	session, err := SessionStore.Get(r, defaultSessionID)
 	if err != nil {
 		return nil
 	}

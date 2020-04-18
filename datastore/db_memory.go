@@ -1,45 +1,46 @@
-package main
+package datastore
 
 import (
 	"fmt"
+	"github.com/IkezawaYuki/go-novel-shelf/domain"
 	"sort"
 	"sync"
 )
 
-var _ NovelDatabase = &memoryDB{}
+var _ domain.NovelDatabase = &memoryDB{}
 
 type memoryDB struct {
 	mu     sync.Mutex
 	nextID int64
-	novels map[int64]*Novel
+	novels map[int64]*domain.Novel
 }
 
-func newMemoryDB() *memoryDB {
+func NewMemoryDB() *memoryDB {
 	return &memoryDB{
 		nextID: 1,
-		novels: make(map[int64]*Novel),
+		novels: make(map[int64]*domain.Novel),
 	}
 }
 
-func (m *memoryDB) ListNovels() ([]*Novel, error) {
+func (m *memoryDB) ListNovels() ([]*domain.Novel, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var novels []*Novel
+	var novels []*domain.Novel
 	for _, b := range m.novels {
 		novels = append(novels, b)
 	}
 	return novels, nil
 }
 
-func (m *memoryDB) ListNovelsCreatedBy(userID string) ([]*Novel, error) {
+func (m *memoryDB) ListNovelsCreatedBy(userID string) ([]*domain.Novel, error) {
 	if userID == "" {
 		return m.ListNovels()
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var novels []*Novel
+	var novels []*domain.Novel
 	for _, b := range m.novels {
 		if b.CreatedByID == userID {
 			novels = append(novels, b)
@@ -49,7 +50,7 @@ func (m *memoryDB) ListNovelsCreatedBy(userID string) ([]*Novel, error) {
 	return novels, nil
 }
 
-func (m *memoryDB) GetNovel(id int64) (*Novel, error) {
+func (m *memoryDB) GetNovel(id int64) (*domain.Novel, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -60,7 +61,7 @@ func (m *memoryDB) GetNovel(id int64) (*Novel, error) {
 	return novel, nil
 }
 
-func (m *memoryDB) AddNovel(b *Novel) (id int64, err error) {
+func (m *memoryDB) AddNovel(b *domain.Novel) (id int64, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -68,7 +69,7 @@ func (m *memoryDB) AddNovel(b *Novel) (id int64, err error) {
 	m.novels[b.ID] = b
 	m.nextID++
 
-	return m.nextID, nil
+	return b.ID, nil
 }
 
 func (m *memoryDB) DeleteNovel(id int64) error {
@@ -85,7 +86,7 @@ func (m *memoryDB) DeleteNovel(id int64) error {
 	return nil
 }
 
-func (m *memoryDB) UpdateBook(b *Novel) error {
+func (m *memoryDB) UpdateBook(b *domain.Novel) error {
 	if b.ID == 0 {
 		return fmt.Errorf("memorydb: book with unassigned ID passed into updateBook")
 	}
@@ -102,7 +103,7 @@ func (m *memoryDB) Close() {
 	m.novels = nil
 }
 
-type novelByTitle []*Novel
+type novelByTitle []*domain.Novel
 
 func (s novelByTitle) Less(i, j int) bool { return s[i].Title < s[j].Title }
 func (s novelByTitle) Len() int           { return len(s) }

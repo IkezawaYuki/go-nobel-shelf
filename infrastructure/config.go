@@ -1,8 +1,11 @@
-package main
+package infrastructure
 
 import (
 	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
+	"fmt"
+	"github.com/IkezawaYuki/go-novel-shelf/datastore"
+	"github.com/IkezawaYuki/go-novel-shelf/domain"
 	"github.com/gorilla/sessions"
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
@@ -12,7 +15,7 @@ import (
 )
 
 var (
-	DB                NovelDatabase
+	DB                domain.NovelDatabase
 	OAuthConfig       *oauth2.Config
 	StorageBucket     *storage.BucketHandle
 	StorageBucketName string
@@ -30,19 +33,19 @@ type cloudSQLConfig struct {
 }
 
 func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	if err := godotenv.Load(".env"); err != nil {
 		log.Fatal(err)
 	}
 
 	var err error
 
-	// DB = newMemoryDB()
+	//DB = datastore.NewMemoryDB()
 	DB, err = configureCloudSQL(cloudSQLConfig{
 		Username: os.Getenv("USER"),
 		Password: os.Getenv("PASSWORD"),
 		Instance: os.Getenv("INSTANCE"),
 	})
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -55,16 +58,16 @@ func init() {
 
 }
 
-func configureCloudSQL(config cloudSQLConfig) (NovelDatabase, error) {
+func configureCloudSQL(config cloudSQLConfig) (domain.NovelDatabase, error) {
 	if os.Getenv("GAE_INSTANCE") != "" {
-		return newMySQLDB(MySQLConfig{
+		return datastore.NewMySQLDB(datastore.MySQLConfig{
 			Username:   config.Username,
 			Password:   config.Password,
 			UnixSocket: "/cloudsql/" + config.Instance,
 		})
 	}
-
-	return newMySQLDB(MySQLConfig{
+	fmt.Println("configureCloudSQL")
+	return datastore.NewMySQLDB(datastore.MySQLConfig{
 		Username: config.Username,
 		Password: config.Password,
 		Host:     "localhost",
