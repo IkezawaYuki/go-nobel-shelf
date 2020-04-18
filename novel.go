@@ -11,6 +11,11 @@ type Novel struct {
 	CreatedByID   string
 }
 
+func (n *Novel) SetCreatorAnonymous() {
+	n.CreatedBy = ""
+	n.CreatedByID = "anonymous"
+}
+
 type NovelDatabase interface {
 	ListNovels() ([]*Novel, error)
 	ListNovelsCreatedBy(userID string) ([]*Novel, error)

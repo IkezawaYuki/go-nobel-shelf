@@ -21,6 +21,8 @@ var (
 	_                 mgo.Session
 )
 
+const PubsubTopicID = "fill-novel-details"
+
 type cloudSQLConfig struct {
 	Username string
 	Password string
