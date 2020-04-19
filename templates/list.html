@@ -1,14 +1,13 @@
-
-<h3>Novels</h3>
+<h3>Books</h3>
 <a href="/novels/add" class="btn btn-success btn-sm">
-    <i class="glyphicon glyphocon-plus"></i>
-    <span>Add Novel</span>
+    <i class="glyphicon glyphicon-plus"></i>
+    <span>Add book</span>
 </a>
 
 {{range .}}
     <div class="media">
         <div class="media-left">
-            <img src="{{if .ImageURL}}{{.ImageURL}}{{else}}https://placekitten.com/g/200/300{{end}}">
+            <img height="200px" src="{{if .ImageURL}}{{.ImageURL}}{{else}}https://placekitten.com/g/200/300{{end}}">
         </div>
         <div class="media-body">
             <h4><a href="/novels/{{.ID}}">{{.Title}}</a></h4>
@@ -16,5 +15,5 @@
         </div>
     </div>
 {{else}}
-    <p>No novels found.</p>
+    <p>No books found.</p>
 {{end}}

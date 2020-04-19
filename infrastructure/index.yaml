@@ -1,8 +1,0 @@
-indexes:
-
-- kind: Novel
-  properties:
-    - name: CreatedByID
-      direction: asc
-    - name: Title
-      direction: asc
