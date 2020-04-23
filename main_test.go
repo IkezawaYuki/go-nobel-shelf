@@ -21,8 +21,13 @@ func TestMain(m *testing.M) {
 
 	if projectID == "" {
 		log.Println("GOLANG_SAMPLES_PROJECT_ID is not set. Skipping")
+		return
 	}
 
 	memoryDB := newMemoryDB()
 	testDBs["memory"] = memoryDB
+	if firestoreProjectID := os.Getenv("GOLANG_SAMPLES_FIRESTORE_PROJECT"); firestoreProjectID != "" {
+		projectID = firestoreProjectID
+
+	}
 }
