@@ -221,7 +221,7 @@ func (n *Novelshelf) updateHandler(w http.ResponseWriter, r *http.Request) *appE
 	if err != nil {
 		return n.appErrorf(r, err, "could not save novel: %v", err)
 	}
-	http.Redirect(w, r, fmt.Sprintf("/novels/%d", novel.ID), http.StatusFound)
+	http.Redirect(w, r, fmt.Sprintf("/novels/%s", novel.ID), http.StatusFound)
 	return nil
 }
 
