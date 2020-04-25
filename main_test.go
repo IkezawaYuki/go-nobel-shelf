@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"cloud.google.com/go/firestore"
 	"context"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -74,7 +76,16 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestNoNovel(t *testing.T) {
+func TestNoNovels(t *testing.T) {
+	for name, db := range testDBs {
+		t.Run(name, func(t *testing.T) {
+			n.DB = db
+			bodyContains(t, wt, "/", "No novels found")
+		})
+	}
+}
+
+func TestNovelDetail(t *testing.T) {
 	for name, db := range testDBs {
 		t.Run(name, func(t *testing.T) {
 			n.DB = db
@@ -94,6 +105,91 @@ func TestNoNovel(t *testing.T) {
 			}
 			bodyContains(t, wt, "/", "No novels found")
 		})
+	}
+}
+
+func TestEditNovel(t *testing.T) {
+	for name, db := range testDBs {
+		t.Run(name, func(t *testing.T) {
+			n.DB = db
+			ctx := context.Background()
+			const title = "novel mc novel"
+			id, err := n.DB.AddNovel(ctx, &Novel{
+				Title: title,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			novelPath := fmt.Sprintf("/novels/%s", id)
+			editPath := novelPath + "/edit"
+			bodyContains(t, wt, editPath, "Edit novel")
+			bodyContains(t, wt, editPath, title)
+
+			var body bytes.Buffer
+			m := multipart.NewWriter(&body)
+			m.WriteField("title", "simpsons")
+			m.WriteField("author", "homer")
+			m.Close()
+
+			resp, err := wt.Post(novelPath, "multipart/form-data; boundary="+m.Boundary(), &body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := resp.Request.URL.Path, novelPath; got != want {
+				t.Errorf("got %s, want %s", got, want)
+			}
+			bodyContains(t, wt, novelPath, "simpsons")
+			bodyContains(t, wt, novelPath, "homer")
+
+			if err := n.DB.DeleteNovel(ctx, id); err != nil {
+				t.Fatalf("got err %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestAddAndDelete(t *testing.T) {
+	for name, db := range testDBs {
+		t.Run(name, func(t *testing.T) {
+			n.DB = db
+			bodyContains(t, wt, "/novels/add", "Add novel")
+			novelPath := fmt.Sprintf("/novels")
+
+			var body bytes.Buffer
+			m := multipart.NewWriter(&body)
+			m.WriteField("title", "simpsons")
+			m.WriteField("author", "homer")
+
+			m.Close()
+			resp, err := wt.Post(novelPath, "multipart/form-data; boundary="+m.Boundary(), &body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gotPath := resp.Request.URL.Path
+			if wantPrefix := "/novels"; !strings.HasPrefix(gotPath, wantPrefix) {
+				t.Fatalf("redirect: got %q, want prefix %q", gotPath, wantPrefix)
+			}
+			bodyContains(t, wt, gotPath, "simpsons")
+			bodyContains(t, wt, gotPath, "homer")
+
+			_, err = wt.Post(gotPath+":delete", "", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestSendLog(t *testing.T) {
+	buf := &bytes.Buffer{}
+	oldLogger := n.logWriter
+	n.logWriter = buf
+
+	bodyContains(t, wt, "/logs", "Log sent!")
+
+	n.logWriter = oldLogger
+	if got, want := buf.String(), "Good job!"; !strings.Contains(got, want) {
+		t.Errorf("/logs logged\n---")
 	}
 }
 
