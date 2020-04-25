@@ -189,7 +189,21 @@ func TestSendLog(t *testing.T) {
 
 	n.logWriter = oldLogger
 	if got, want := buf.String(), "Good job!"; !strings.Contains(got, want) {
-		t.Errorf("/logs logged\n---")
+		t.Errorf("/logs logged\n----\n%v\n----\nWant to contain:\n---\n%v", got, want)
+	}
+}
+
+func TestSendError(t *testing.T) {
+	buf := &bytes.Buffer{}
+	oldLogger := n.logWriter
+	n.logWriter = buf
+
+	bodyContains(t, wt, "/errors", "Error Reporting")
+
+	n.logWriter = oldLogger
+
+	if got, want := buf.String(), "uh oh"; !strings.Contains(got, want) {
+		t.Errorf("/errors logged\n----\n%v\n----\nWant to contain:\n----\n%v", got, want)
 	}
 }
 

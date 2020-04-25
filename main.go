@@ -43,7 +43,12 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Println(client)
-	db, err := newFirestoreDB(client)
+	//db, err := newFirestoreDB(client)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//fmt.Println(db)
+	db := newMemoryDB()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -87,7 +92,8 @@ func (n *Novelshelf) registerHandlers() {
 			w.Write([]byte("ok"))
 		})
 
-	//r.Methods("GET").Path("/logs").Handler(appHandler(n.))
+	r.Methods("GET").Path("/logs").Handler(appHandler(n.sendLog))
+	r.Methods("GET").Path("/errors").Handler(appHandler(n.sendError))
 
 	http.Handle("/", handlers.CombinedLoggingHandler(n.logWriter, r))
 }
@@ -236,6 +242,18 @@ func (n *Novelshelf) deleteHandler(w http.ResponseWriter, r *http.Request) *appE
 	return nil
 }
 
+func (n *Novelshelf) sendLog(w http.ResponseWriter, r *http.Request) *appError {
+	fmt.Fprintln(n.logWriter, "Hey, you triggered a custom log entry. Good job!")
+	fmt.Fprintln(w, `<html>Log sent! Check the <a href="http://console.cloud.google.com/logs">logging section of the Cloud Console</a>.</html>`)
+	return nil
+}
+
+func (n *Novelshelf) sendError(w http.ResponseWriter, r *http.Request) *appError {
+	msg := `<html>Logging an error. Check<a href="http://console.cloud.google.com/errors">Error Reporting</a> (it may take a minute or two for the error to appear).</html>`
+	err := errors.New("uh oh! an error occurred")
+	return n.appErrorf(r, err, msg)
+}
+
 type appHandler func(http.ResponseWriter, *http.Request) *appError
 
 type appError struct {
@@ -254,7 +272,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(e.Code)
 		e.Novel.errorClient.Report(errorreporting.Entry{
 			Error: e.Error,
-			Req:   e.Req,
+			Req:   r,
 			Stack: e.Stack,
 		})
 		e.Novel.errorClient.Flush()
