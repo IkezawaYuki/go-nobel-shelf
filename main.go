@@ -43,12 +43,12 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Println(client)
-	//db, err := newFirestoreDB(client)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//fmt.Println(db)
-	db := newMemoryDB()
+	db, err := newFirestoreDB(client)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(db)
+	//db := newMemoryDB()
 	if err != nil {
 		log.Fatal(err)
 	}
